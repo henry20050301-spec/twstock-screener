@@ -47,6 +47,102 @@ def iso(d):
     return (dt.datetime.utcnow() + dt.timedelta(hours=8)).strftime("%Y-%m-%d")
 
 
+INST = D / "inst.json"
+OPEN = "https://openapi.twse.com.tw/v1/opendata"
+TPEX_OPEN = "https://www.tpex.org.tw/openapi/v1"
+
+
+def fld(r, *subs):
+    """依欄位名稱關鍵字取值（容忍欄位名稱些微差異）"""
+    for k, v in r.items():
+        if all(x in k for x in subs):
+            return v
+    return None
+
+
+def fetch_rev():
+    """月營收：年增率、月增率。回傳 {code: dict(rv, rm, rym)}"""
+    out = {}
+    for url in (f"{OPEN}/t187ap05_L", f"{TPEX_OPEN}/mopsfin_t187ap05_O"):
+        try:
+            for r in get(url):
+                c = str(fld(r, "公司代號") or "").strip()
+                if c:
+                    out[c] = dict(rv=num(fld(r, "去年同月增減")), rm=num(fld(r, "上月比較增減")),
+                                  rym=str(fld(r, "資料年月") or ""))
+        except Exception as e:
+            print("警告：月營收抓取失敗：", url[-20:], e)
+    print(f"月營收：{len(out)} 檔")
+    return out
+
+
+def fetch_eps():
+    """最新一期財報的基本每股盈餘。回傳 {code: dict(eps, eq)}"""
+    out = {}
+    urls = [f"{OPEN}/t187ap06_L_{k}" for k in ("ci", "basi", "bd", "fh", "ins", "mim")]
+    urls += [f"{TPEX_OPEN}/mopsfin_t187ap06_O_{k}" for k in ("ci", "basi", "bd", "fh", "ins", "mim")]
+    for url in urls:
+        try:
+            for r in get(url, tries=2):
+                c = str(fld(r, "公司代號") or "").strip()
+                e = num(fld(r, "基本每股盈餘"))
+                if c and e is not None:
+                    out[c] = dict(eps=e, eq=f"{fld(r, '年度')}Q{fld(r, '季別')}")
+        except Exception as e:
+            print("略過 EPS 來源：", url[-24:], type(e).__name__)
+    print(f"EPS：{len(out)} 檔")
+    return out
+
+
+def fetch_inst(ds):
+    """證交所三大法人買賣超（上市），回傳 {code: (外資股數, 投信股數)}；無資料回傳 None"""
+    j = get(f"https://www.twse.com.tw/rwd/zh/fund/T86?date={ds}&selectType=ALLBUT0999&response=json")
+    if j.get("stat") != "OK" or not j.get("data"):
+        return None
+    f = j["fields"]
+    ic = f.index("證券代號")
+    fi = next(i for i, k in enumerate(f) if k.startswith("外") and "買賣超" in k)
+    ti = next(i for i, k in enumerate(f) if k.startswith("投信") and "買賣超" in k)
+    return {r[ic].strip(): (int(num(r[fi]) or 0), int(num(r[ti]) or 0)) for r in j["data"]}
+
+
+def update_inst(date):
+    """累積最近 20 個交易日的法人買賣超；首次執行回補約 3 週"""
+    import time
+    inst = json.loads(INST.read_text("utf-8")) if INST.exists() else {}
+    d = dt.date.fromisoformat(date)
+    days = [date]
+    if not inst:
+        days = [(d - dt.timedelta(days=k)).isoformat() for k in range(21, -1, -1)]
+        days = [x for x in days if dt.date.fromisoformat(x).weekday() < 5]
+    for day in days:
+        try:
+            m = fetch_inst(day.replace("-", ""))
+        except Exception as e:
+            print("法人資料失敗：", day, type(e).__name__)
+            continue
+        if m:
+            for c, (a, b) in m.items():
+                h = inst.setdefault(c, [])
+                if not h or h[-1][0] < day:
+                    h.append([day, a, b])
+                    del h[:-20]
+        if len(days) > 1:
+            time.sleep(3)  # 回補時放慢，避免被證交所限流
+    INST.write_text(json.dumps(inst, ensure_ascii=False, separators=(",", ":")), "utf-8")
+    return inst
+
+
+def streak(h, i):
+    n = 0
+    for x in reversed(h):
+        if x[i] > 0:
+            n += 1
+        else:
+            break
+    return n
+
+
 def twse_web():
     """證交所網站版盤後 API：可指定日期，收盤後即有資料。從今天往回找最近有資料的一天。"""
     base = "https://www.twse.com.tw/rwd/zh/afterTrading"
@@ -150,7 +246,7 @@ def rsi(cl, n=14):
     return 100.0 if l == 0 else round(100 - 100 / (1 + g / l), 1)
 
 
-def build(code, h, today, v):
+def build(code, h, today, v, ex=None):
     d = h["d"]; cl = [x[1] for x in d]; vo = [x[2] for x in d]
     ma = lambda n: round(sum(cl[-n:]) / n, 2) if len(cl) >= n else None
     vr = None
@@ -162,7 +258,7 @@ def build(code, h, today, v):
     pe, dy, pb = v.get(code, (None, None, None))
     return dict(c=code, n=h["n"], m=h["m"], close=today["close"], pct=pct, vol=vo[-1],
                 pe=pe, dy=dy, pb=pb, ma5=ma(5), ma20=ma(20), ma60=ma(60), vr=vr,
-                rsi=rsi(cl), brk=bool(hi and cl[-1] > hi), spark=cl[-30:])
+                rsi=rsi(cl), brk=bool(hi and cl[-1] > hi), spark=cl[-30:], **(ex or {}))
 
 
 def main():
@@ -182,6 +278,25 @@ def main():
             h["d"].append([r["date"], r["close"], r["vol"]])
         h["d"] = h["d"][-KEEP:]
     HIST.write_text(json.dumps(hist, ensure_ascii=False, separators=(",", ":")), "utf-8")
+    def safe(fn, *a):
+        try:
+            return fn(*a)
+        except Exception as e:
+            print("警告：", fn.__name__, "失敗：", e)
+            return {}
+    rev, eps, inst = safe(fetch_rev), safe(fetch_eps), safe(update_inst, date)
+
+    def extra(c):
+        ex = {}
+        ex.update(rev.get(c, {}))
+        ex.update(eps.get(c, {}))
+        h = inst.get(c)
+        if h:
+            ex.update(fb=round(h[-1][1] / 1000), tb=round(h[-1][2] / 1000),
+                      f5=round(sum(x[1] for x in h[-5:]) / 1000),
+                      fs=streak(h, 1), ts=streak(h, 2))
+        return ex
+
     cutoff = (dt.date.fromisoformat(date) - dt.timedelta(days=5)).isoformat()
     stocks = []
     for c, h in hist.items():
@@ -192,7 +307,7 @@ def main():
         else:  # 今天沒抓到（例如櫃買中心連線失敗）：沿用最後一筆
             last = h["d"][-1]; prev = h["d"][-2][1] if len(h["d"]) > 1 else last[1]
             t = dict(close=last[1], chg=round(last[1] - prev, 2))
-        stocks.append(build(c, h, t, val))
+        stocks.append(build(c, h, t, val, extra(c)))
     OUT.write_text(json.dumps({"updated": date, "stocks": stocks},
                               ensure_ascii=False, separators=(",", ":")), "utf-8")
     print(f"完成：{date}，共 {len(stocks)} 檔")
