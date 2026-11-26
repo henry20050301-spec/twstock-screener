@@ -16,10 +16,18 @@ TPEX_PRICE = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quot
 TPEX_PE = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis"
 
 
-def get(url):
-    r = requests.get(url, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
-    r.raise_for_status()
-    return r.json()
+def get(url, tries=3, timeout=30):
+    import time
+    for i in range(tries):
+        try:
+            r = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
+            r.raise_for_status()
+            return r.json()
+        except requests.RequestException as e:
+            print(f"請求失敗（第 {i + 1}/{tries} 次）：{url[:60]} {type(e).__name__}")
+            if i == tries - 1:
+                raise
+            time.sleep(3)
 
 
 def num(x):
@@ -92,17 +100,26 @@ def fetch_today():
                 rows[c] = dict(n=r["Name"], m="上市", date=iso(r.get("Date")),
                                close=num(r["ClosingPrice"]), chg=num(r.get("Change")),
                                vol=int(num(r.get("TradingVolume") or r.get("TradeVolume")) or 0))
-    for r in get(TPEX_PRICE):
-        c = r.get("SecuritiesCompanyCode", "")
-        if re.fullmatch(r"\d{4}", c) and num(r.get("Close")):
-            rows[c] = dict(n=r["CompanyName"], m="上櫃", date=iso(r.get("Date")),
-                           close=num(r["Close"]), chg=num(r.get("Change")),
-                           vol=int(num(r.get("TradingShares")) or 0))
-    for r in get(TWSE_PE):
-        val.setdefault(r.get("Code"), (num(r.get("PEratio")), num(r.get("DividendYield")), num(r.get("PBratio"))))
-    for r in get(TPEX_PE):
-        val[r.get("SecuritiesCompanyCode")] = (num(r.get("PriceEarningRatio")),
-                                                num(r.get("YieldRatio")), num(r.get("PriceBookRatio")))
+    try:
+        for r in get(TPEX_PRICE):
+            c = r.get("SecuritiesCompanyCode", "")
+            if re.fullmatch(r"\d{4}", c) and num(r.get("Close")):
+                rows[c] = dict(n=r["CompanyName"], m="上櫃", date=iso(r.get("Date")),
+                               close=num(r["Close"]), chg=num(r.get("Change")),
+                               vol=int(num(r.get("TradingShares")) or 0))
+    except Exception as e:
+        print("警告：櫃買中心行情抓取失敗，上櫃沿用上次資料：", e)
+    try:
+        for r in get(TWSE_PE):
+            val.setdefault(r.get("Code"), (num(r.get("PEratio")), num(r.get("DividendYield")), num(r.get("PBratio"))))
+    except Exception as e:
+        print("警告：證交所本益比(openapi)抓取失敗：", e)
+    try:
+        for r in get(TPEX_PE):
+            val[r.get("SecuritiesCompanyCode")] = (num(r.get("PriceEarningRatio")),
+                                                    num(r.get("YieldRatio")), num(r.get("PriceBookRatio")))
+    except Exception as e:
+        print("警告：櫃買中心本益比抓取失敗：", e)
     return rows, val
 
 
@@ -165,7 +182,17 @@ def main():
             h["d"].append([r["date"], r["close"], r["vol"]])
         h["d"] = h["d"][-KEEP:]
     HIST.write_text(json.dumps(hist, ensure_ascii=False, separators=(",", ":")), "utf-8")
-    stocks = [build(c, hist[c], r, val) for c, r in rows.items()]
+    cutoff = (dt.date.fromisoformat(date) - dt.timedelta(days=5)).isoformat()
+    stocks = []
+    for c, h in hist.items():
+        if not h["d"] or h["d"][-1][0] < cutoff:
+            continue  # 已下市或久未更新
+        if c in rows:
+            t = rows[c]
+        else:  # 今天沒抓到（例如櫃買中心連線失敗）：沿用最後一筆
+            last = h["d"][-1]; prev = h["d"][-2][1] if len(h["d"]) > 1 else last[1]
+            t = dict(close=last[1], chg=round(last[1] - prev, 2))
+        stocks.append(build(c, h, t, val))
     OUT.write_text(json.dumps({"updated": date, "stocks": stocks},
                               ensure_ascii=False, separators=(",", ":")), "utf-8")
     print(f"完成：{date}，共 {len(stocks)} 檔")
