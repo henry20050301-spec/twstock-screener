@@ -23,6 +23,14 @@ th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
 .up{color:var(--up)}.dn{color:var(--dn)}.cnt{margin:8px 2px;color:var(--mu)}
 .tag{font-size:11px;padding:1px 6px;border-radius:8px;background:var(--bg);color:var(--mu)}
 svg{vertical-align:middle}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:12px;z-index:9}
+.modal.on{display:flex}
+.mbox{background:var(--card);border-radius:12px;max-width:900px;width:100%;padding:14px;max-height:95vh;overflow:auto}
+.mh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.mh button{border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:6px;padding:3px 10px;cursor:pointer}
+.mh button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+#tip{min-height:22px;margin-top:6px;color:var(--tx)}
+tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
 </style>
 </head>
 <body>
@@ -58,6 +66,11 @@ svg{vertical-align:middle}
 <div class="cnt" id="cnt"></div>
 <div class="tw"><table><thead><tr id="hd"></tr></thead><tbody id="bd"></tbody></table></div>
 
+<div class="modal" id="md"><div class="mbox">
+  <div class="mh"><div><b id="mt" style="font-size:16px"></b> <span id="mp"></span></div>
+  <div class="rg" id="rg"></div><button id="mx">✕ 關閉</button></div>
+  <div id="ch"></div><div class="sub" id="lg"><span style="color:#f59e0b">━ 5日線</span>　<span style="color:#2563eb">━ 20日線</span>　<span style="color:#9333ea">━ 60日線</span>　下方柱狀為成交量</div>
+  <div id="tip"></div></div></div>
 <script>
 const COLS=[["c","代號"],["n","名稱"],["close","收盤"],["pct","漲跌%"],["vol","成交量(張)"],["vr","量比"],
 ["ma20","20MA"],["ma60","60MA"],["rsi","RSI"],["pe","本益比"],["dy","殖利率%"],["pb","淨值比"],["spark","30日"]];
@@ -108,7 +121,7 @@ function render(){
   $("cnt").textContent=`符合條件：${r.length} 檔${r.length>200?"（僅顯示前 200 檔）":""}`;
   $("bd").innerHTML=r.slice(0,200).map(s=>{const c=s.pct>0?"up":s.pct<0?"dn":"";
     const f=(x,d=2)=>x==null?"–":x.toFixed(d);
-    return `<tr><td>${s.c}</td><td>${s.n} <span class="tag">${s.m}</span></td><td class="${c}">${f(s.close)}</td>
+    return `<tr data-c="${s.c}"><td>${s.c}</td><td>${s.n} <span class="tag">${s.m}</span></td><td class="${c}">${f(s.close)}</td>
     <td class="${c}">${s.pct>0?"+":""}${f(s.pct)}</td><td>${Math.round(s.vol/1000).toLocaleString()}</td>
     <td>${f(s.vr)}</td><td>${f(s.ma20)}</td><td>${f(s.ma60)}</td><td>${f(s.rsi,1)}</td>
     <td>${f(s.pe,1)}</td><td>${f(s.dy)}</td><td>${f(s.pb)}</td><td>${spark(s.spark)}</td></tr>`}).join("");
@@ -120,6 +133,49 @@ function init(){
   render();
 }
 document.querySelectorAll(".panel input,.panel select").forEach(e=>e.addEventListener("input",render));
+let HIST=null,CUR=null,RNG=66;
+async function getHist(){if(HIST)return HIST;try{const r=await fetch("data/history.json");if(!r.ok)throw 0;HIST=await r.json()}catch(e){HIST={}}return HIST}
+async function openChart(code){
+  const s=DATA.find(x=>x.c===code);if(!s)return;
+  $("mt").textContent=`${s.c} ${s.n}`;
+  const c=s.pct>0?"up":s.pct<0?"dn":"";
+  $("mp").innerHTML=`<span class="${c}">${s.close.toFixed(2)}　${s.pct>0?"+":""}${s.pct.toFixed(2)}%</span>`;
+  $("ch").innerHTML='<div class="sub">載入中…</div>';$("md").classList.add("on");
+  const h=await getHist();let d=h[code]&&h[code].d;
+  if(!d||d.length<2)d=(s.spark||[]).map((v,i)=>["第"+(i+1)+"天",v,0]);
+  CUR=d;draw();
+}
+const ma=(cl,n)=>cl.map((_,i)=>i+1<n?null:cl.slice(i+1-n,i+1).reduce((a,b)=>a+b,0)/n);
+function draw(){
+  const full=CUR,N=Math.min(RNG,full.length),off=full.length-N,cl=full.map(x=>x[1]);
+  $("rg").innerHTML=[[22,"1個月"],[66,"3個月"],[130,"全部"]].map(([n,t])=>`<button data-n="${n}" class="${n===RNG?"on":""}">${t}</button>`).join("");
+  const M=[[5,"#f59e0b"],[20,"#2563eb"],[60,"#9333ea"]].map(([n,col])=>[n,col,ma(cl,n).slice(off)]);
+  const D=full.slice(off),p=D.map(x=>x[1]);
+  const vals=p.concat(...M.map(m=>m[2].filter(v=>v!=null)));
+  let lo=Math.min(...vals),hi=Math.max(...vals);const pad=(hi-lo)*.06||1;lo-=pad;hi+=pad;
+  const W=860,L=48,R=8,PT=10,PB=270,VT=290,VB=360,st=(W-L-R)/Math.max(N-1,1);
+  const X=i=>L+i*st,Y=v=>PB-(v-lo)/(hi-lo)*(PB-PT);
+  const vm=Math.max(...D.map(x=>x[2]),1),bw=Math.max((W-L-R)/N*.7,1);
+  let g="";
+  for(let k=0;k<=4;k++){const v=lo+(hi-lo)*k/4,y=Y(v);g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--bd)"/><text x="${L-6}" y="${y+4}" text-anchor="end" font-size="11" fill="var(--mu)">${v.toFixed(v>100?0:1)}</text>`}
+  D.forEach((x,i)=>{const up=i===0||x[1]>=D[i-1][1],h=x[2]/vm*(VB-VT);g+=`<rect x="${X(i)-bw/2}" y="${VB-h}" width="${bw}" height="${h}" fill="var(${up?"--up":"--dn"})" opacity=".55"/>`});
+  M.forEach(([n,col,a])=>{const pts=a.map((v,i)=>v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");if(pts)g+=`<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.2"/>`});
+  g+=`<polyline points="${p.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--tx)" stroke-width="1.8"/>`;
+  [0,Math.floor((N-1)/2),N-1].forEach((i,k)=>g+=`<text x="${X(i)}" y="${VB+16}" text-anchor="${k==0?"start":k==2?"end":"middle"}" font-size="11" fill="var(--mu)">${D[i][0]}</text>`);
+  g+=`<line id="cx" y1="${PT}" y2="${VB}" stroke="var(--mu)" stroke-dasharray="3" style="display:none"/>`;
+  $("ch").innerHTML=`<svg id="sv" viewBox="0 0 ${W} 380" width="100%" style="display:block;touch-action:none">${g}</svg>`;
+  const sv=$("sv"),f=v=>v==null?"–":v.toFixed(2);
+  const mv=e=>{const b=sv.getBoundingClientRect(),t=e.touches?e.touches[0].clientX:e.clientX;
+    let i=Math.round(((t-b.left)/b.width*W-L)/st);i=Math.max(0,Math.min(N-1,i));
+    const cx=$("cx");cx.setAttribute("x1",X(i));cx.setAttribute("x2",X(i));cx.style.display="";
+    $("tip").innerHTML=`${D[i][0]}　收盤 <b>${D[i][1].toFixed(2)}</b>　成交量 ${Math.round(D[i][2]/1000).toLocaleString()} 張　`+M.map(m=>`<span style="color:${m[1]}">${m[0]}MA ${f(m[2][i])}</span>`).join("　")};
+  sv.onmousemove=mv;sv.ontouchmove=mv;mv({clientX:sv.getBoundingClientRect().right});
+}
+const closeM=()=>$("md").classList.remove("on");
+$("rg").onclick=e=>{const n=e.target.dataset.n;if(n){RNG=+n;draw()}};
+$("bd").onclick=e=>{const tr=e.target.closest("tr");if(tr&&tr.dataset.c)openChart(tr.dataset.c)};
+$("mx").onclick=closeM;$("md").onclick=e=>{if(e.target.id==="md")closeM()};
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeM()});
 load();
 </script>
 </body>
