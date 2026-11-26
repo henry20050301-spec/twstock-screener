@@ -39,14 +39,59 @@ def iso(d):
     return (dt.datetime.utcnow() + dt.timedelta(hours=8)).strftime("%Y-%m-%d")
 
 
+def twse_web():
+    """證交所網站版盤後 API：可指定日期，收盤後即有資料。從今天往回找最近有資料的一天。"""
+    base = "https://www.twse.com.tw/rwd/zh/afterTrading"
+    tag = lambda s: re.sub(r"<[^>]*>", "", str(s))
+    day = dt.datetime.utcnow() + dt.timedelta(hours=8)
+    for _ in range(10):
+        ds = day.strftime("%Y%m%d")
+        day -= dt.timedelta(days=1)
+        j = get(f"{base}/MI_INDEX?date={ds}&type=ALLBUT0999&response=json")
+        if j.get("stat") != "OK":
+            continue
+        t = next((t for t in j.get("tables", [])
+                  if "證券代號" in t.get("fields", []) and "收盤價" in t["fields"]), None)
+        if not t or not t.get("data"):
+            continue
+        f = t["fields"]
+        ic, inm, iv, ip, id_ = (f.index(k) for k in ("證券代號", "證券名稱", "成交股數", "收盤價", "漲跌價差"))
+        isg = next(i for i, k in enumerate(f) if k.startswith("漲跌("))
+        rows = {}
+        for r in t["data"]:
+            c, close = r[ic], num(r[ip])
+            if re.fullmatch(r"\d{4}", c) and close:
+                sign = -1 if "-" in tag(r[isg]) else 1
+                rows[c] = dict(n=r[inm].strip(), m="上市", date=iso(ds), close=close,
+                               chg=sign * abs(num(r[id_]) or 0), vol=int(num(r[iv]) or 0))
+        val = {}
+        try:
+            p = get(f"{base}/BWIBBU_d?date={ds}&selectType=ALL&response=json")
+            if p.get("stat") == "OK":
+                pf = p["fields"]
+                a, b, y, d = (pf.index(k) for k in ("證券代號", "本益比", "殖利率(%)", "股價淨值比"))
+                for r in p["data"]:
+                    val[r[a]] = (num(r[b]), num(r[y]), num(r[d]))
+        except Exception as e:
+            print("本益比資料抓取失敗：", e)
+        print(f"證交所網站版：{ds}，{len(rows)} 檔")
+        return rows, val
+    raise RuntimeError("近 10 天找不到證交所資料")
+
+
 def fetch_today():
     rows, val = {}, {}
-    for r in get(TWSE_PRICE):
-        c = r.get("Code", "")
-        if re.fullmatch(r"\d{4}", c) and num(r.get("ClosingPrice")):
-            rows[c] = dict(n=r["Name"], m="上市", date=iso(r.get("Date")),
-                           close=num(r["ClosingPrice"]), chg=num(r.get("Change")),
-                           vol=int(num(r.get("TradeVolume")) or 0))
+    try:
+        w_rows, w_val = twse_web()
+        rows.update(w_rows); val.update(w_val)
+    except Exception as e:
+        print("證交所網站版失敗，改用 openapi：", e)
+        for r in get(TWSE_PRICE):
+            c = r.get("Code", "")
+            if re.fullmatch(r"\d{4}", c) and num(r.get("ClosingPrice")):
+                rows[c] = dict(n=r["Name"], m="上市", date=iso(r.get("Date")),
+                               close=num(r["ClosingPrice"]), chg=num(r.get("Change")),
+                               vol=int(num(r.get("TradingVolume") or r.get("TradeVolume")) or 0))
     for r in get(TPEX_PRICE):
         c = r.get("SecuritiesCompanyCode", "")
         if re.fullmatch(r"\d{4}", c) and num(r.get("Close")):
@@ -54,7 +99,7 @@ def fetch_today():
                            close=num(r["Close"]), chg=num(r.get("Change")),
                            vol=int(num(r.get("TradingShares")) or 0))
     for r in get(TWSE_PE):
-        val[r.get("Code")] = (num(r.get("PEratio")), num(r.get("DividendYield")), num(r.get("PBratio")))
+        val.setdefault(r.get("Code"), (num(r.get("PEratio")), num(r.get("DividendYield")), num(r.get("PBratio"))))
     for r in get(TPEX_PE):
         val[r.get("SecuritiesCompanyCode")] = (num(r.get("PriceEarningRatio")),
                                                 num(r.get("YieldRatio")), num(r.get("PriceBookRatio")))
