@@ -61,6 +61,16 @@ tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
     <label><select id="f_m"><option value="">上市+上櫃</option><option>上市</option><option>上櫃</option></select></label>
     <label><input type="text" id="f_q" placeholder="搜尋代號或名稱"></label>
   </div>
+  <div><h3>籌碼面（上市）</h3>
+    <label>外資連續買超 ≥ <input type="number" id="f_fs" placeholder="天"></label>
+    <label>投信連續買超 ≥ <input type="number" id="f_ts" placeholder="天"></label>
+    <label>外資近5日買超 ≥ <input type="number" id="f_f5" placeholder="張"></label>
+  </div>
+  <div><h3>營收與獲利</h3>
+    <label>月營收年增率 ≥ <input type="number" id="f_rv" placeholder="%"></label>
+    <label>月營收月增率 ≥ <input type="number" id="f_rm" placeholder="%"></label>
+    <label>最新EPS ≥ <input type="number" id="f_eps" step="0.1" placeholder="元"></label>
+  </div>
 </div>
 
 <div class="cnt" id="cnt"></div>
@@ -73,7 +83,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
   <div id="tip"></div></div></div>
 <script>
 const COLS=[["c","代號"],["n","名稱"],["close","收盤"],["pct","漲跌%"],["vol","成交量(張)"],["vr","量比"],
-["ma20","20MA"],["ma60","60MA"],["rsi","RSI"],["pe","本益比"],["dy","殖利率%"],["pb","淨值比"],["spark","30日"]];
+["ma20","20MA"],["ma60","60MA"],["rsi","RSI"],["pe","本益比"],["dy","殖利率%"],["pb","淨值比"],["fb","外資(張)"],["fs","外資連買"],["ts","投信連買"],["rv","營收YoY%"],["eps","EPS"],["spark","30日"]];
 let DATA=[],sk="vol",asc=false;
 const $=id=>document.getElementById(id), val=id=>{const v=$(id).value;return v===""?null:+v};
 
@@ -98,6 +108,7 @@ function spark(s){if(!s||s.length<2)return"";const mn=Math.min(...s),mx=Math.max
 function filt(){
   const q=$("f_q").value.trim().toLowerCase(),m=$("f_m").value;
   const vr=val("f_vr"),rmin=val("f_rmin"),rmax=val("f_rmax"),dy=val("f_dy"),pe=val("f_pe"),pb=val("f_pb"),p=val("f_p"),v=val("f_v");
+  const fs=val("f_fs"),ts=val("f_ts"),f5=val("f_f5"),rv=val("f_rv"),rm=val("f_rm"),ep=val("f_eps");
   return DATA.filter(s=>{
     if(m&&s.m!==m)return false;
     if(q&&!(s.c.includes(q)||s.n.toLowerCase().includes(q)))return false;
@@ -113,6 +124,12 @@ function filt(){
     if(pb!=null&&!(s.pb!=null&&s.pb<=pb))return false;
     if(p!=null&&s.close<p)return false;
     if(v!=null&&s.vol/1000<v)return false;
+    if(fs!=null&&!(s.fs!=null&&s.fs>=fs))return false;
+    if(ts!=null&&!(s.ts!=null&&s.ts>=ts))return false;
+    if(f5!=null&&!(s.f5!=null&&s.f5>=f5))return false;
+    if(rv!=null&&!(s.rv!=null&&s.rv>=rv))return false;
+    if(rm!=null&&!(s.rm!=null&&s.rm>=rm))return false;
+    if(ep!=null&&!(s.eps!=null&&s.eps>=ep))return false;
     return true});
 }
 function render(){
@@ -124,7 +141,7 @@ function render(){
     return `<tr data-c="${s.c}"><td>${s.c}</td><td>${s.n} <span class="tag">${s.m}</span></td><td class="${c}">${f(s.close)}</td>
     <td class="${c}">${s.pct>0?"+":""}${f(s.pct)}</td><td>${Math.round(s.vol/1000).toLocaleString()}</td>
     <td>${f(s.vr)}</td><td>${f(s.ma20)}</td><td>${f(s.ma60)}</td><td>${f(s.rsi,1)}</td>
-    <td>${f(s.pe,1)}</td><td>${f(s.dy)}</td><td>${f(s.pb)}</td><td>${spark(s.spark)}</td></tr>`}).join("");
+    <td>${f(s.pe,1)}</td><td>${f(s.dy)}</td><td>${f(s.pb)}</td><td class="${s.fb>0?"up":s.fb<0?"dn":""}">${s.fb==null?"–":s.fb.toLocaleString()}</td><td>${s.fs==null?"–":s.fs}</td><td>${s.ts==null?"–":s.ts}</td><td class="${s.rv>0?"up":s.rv<0?"dn":""}">${f(s.rv,1)}</td><td>${f(s.eps)}</td><td>${spark(s.spark)}</td></tr>`}).join("");
 }
 function init(){
   $("hd").innerHTML=COLS.map(([k,t])=>`<th data-k="${k}">${t}${k===sk?(asc?" ▲":" ▼"):""}</th>`).join("");
