@@ -269,7 +269,7 @@ def ind(cl):
         m = sum(w) / 20
         sd = (sum((x - m) ** 2 for x in w) / 20) ** 0.5
         if sd > 0:
-            o.update(pb=round((cl[-1] - (m - 2 * sd)) / (4 * sd), 2), bw=round(4 * sd / m * 100, 1))
+            o.update(bp=round((cl[-1] - (m - 2 * sd)) / (4 * sd), 2), bw=round(4 * sd / m * 100, 1))
     return o
 
 
