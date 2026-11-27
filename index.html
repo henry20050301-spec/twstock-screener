@@ -35,7 +35,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
 </head>
 <body>
 <h1>台股選股篩選</h1>
-<div class="sub" id="meta">載入中…</div>
+<div class="sub"><span id="meta">載入中…</span>　<a href="analysis.html">📊 分析工具（多股比較／策略回測／風險地圖）</a></div>
 <div class="warn" id="warn">找不到 data/screener.json，目前顯示的是隨機產生的示範資料，不代表真實行情。</div>
 
 <div class="panel">
@@ -61,6 +61,16 @@ tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
     <label><select id="f_m"><option value="">上市+上櫃</option><option>上市</option><option>上櫃</option></select></label>
     <label><input type="text" id="f_q" placeholder="搜尋代號或名稱"></label>
   </div>
+  <div><h3>MACD / KD / 布林通道</h3>
+    <label><input type="checkbox" id="f_mx"> MACD 黃金交叉（今日）</label>
+    <label><input type="checkbox" id="f_mo"> MACD 柱狀體 &gt; 0</label>
+    <label><input type="checkbox" id="f_mz"> DIF 在零軸之上</label>
+    <label><input type="checkbox" id="f_kx"> KD 黃金交叉（今日）</label>
+    <label><input type="checkbox" id="f_kl"> K 值 &lt; 20（低檔）</label>
+    <label><input type="checkbox" id="f_bu"> 突破布林上軌</label>
+    <label><input type="checkbox" id="f_bl"> 跌破布林下軌</label>
+    <label>布林帶寬 ≤ <input type="number" id="f_bw" placeholder="% 如 8"></label>
+  </div>
   <div><h3>籌碼面（上市）</h3>
     <label>外資連續買超 ≥ <input type="number" id="f_fs" placeholder="天"></label>
     <label>投信連續買超 ≥ <input type="number" id="f_ts" placeholder="天"></label>
@@ -83,7 +93,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
   <div id="tip"></div></div></div>
 <script>
 const COLS=[["c","代號"],["n","名稱"],["close","收盤"],["pct","漲跌%"],["vol","成交量(張)"],["vr","量比"],
-["ma20","20MA"],["ma60","60MA"],["rsi","RSI"],["pe","本益比"],["dy","殖利率%"],["pb","淨值比"],["fb","外資(張)"],["fs","外資連買"],["ts","投信連買"],["rv","營收YoY%"],["eps","EPS"],["spark","30日"]];
+["ma20","20MA"],["ma60","60MA"],["rsi","RSI"],["pe","本益比"],["dy","殖利率%"],["pb","淨值比"],["fb","外資(張)"],["fs","外資連買"],["ts","投信連買"],["rv","營收YoY%"],["eps","EPS"],["osc","MACD柱"],["k","K"],["pb","布林%B"],["spark","30日"]];
 let DATA=[],sk="vol",asc=false;
 const $=id=>document.getElementById(id), val=id=>{const v=$(id).value;return v===""?null:+v};
 
@@ -108,7 +118,7 @@ function spark(s){if(!s||s.length<2)return"";const mn=Math.min(...s),mx=Math.max
 function filt(){
   const q=$("f_q").value.trim().toLowerCase(),m=$("f_m").value;
   const vr=val("f_vr"),rmin=val("f_rmin"),rmax=val("f_rmax"),dy=val("f_dy"),pe=val("f_pe"),pb=val("f_pb"),p=val("f_p"),v=val("f_v");
-  const fs=val("f_fs"),ts=val("f_ts"),f5=val("f_f5"),rv=val("f_rv"),rm=val("f_rm"),ep=val("f_eps");
+  const bwv=val("f_bw"),fs=val("f_fs"),ts=val("f_ts"),f5=val("f_f5"),rv=val("f_rv"),rm=val("f_rm"),ep=val("f_eps");
   return DATA.filter(s=>{
     if(m&&s.m!==m)return false;
     if(q&&!(s.c.includes(q)||s.n.toLowerCase().includes(q)))return false;
@@ -130,6 +140,14 @@ function filt(){
     if(rv!=null&&!(s.rv!=null&&s.rv>=rv))return false;
     if(rm!=null&&!(s.rm!=null&&s.rm>=rm))return false;
     if(ep!=null&&!(s.eps!=null&&s.eps>=ep))return false;
+    if($("f_mx").checked&&!s.mx)return false;
+    if($("f_mo").checked&&!(s.osc>0))return false;
+    if($("f_mz").checked&&!s.mz)return false;
+    if($("f_kx").checked&&!s.kx)return false;
+    if($("f_kl").checked&&!(s.k<20))return false;
+    if($("f_bu").checked&&!(s.pb>1))return false;
+    if($("f_bl").checked&&!(s.pb<0))return false;
+    if(bwv!=null&&!(s.bw!=null&&s.bw<=bwv))return false;
     return true});
 }
 function render(){
@@ -141,7 +159,7 @@ function render(){
     return `<tr data-c="${s.c}"><td>${s.c}</td><td>${s.n} <span class="tag">${s.m}</span></td><td class="${c}">${f(s.close)}</td>
     <td class="${c}">${s.pct>0?"+":""}${f(s.pct)}</td><td>${Math.round(s.vol/1000).toLocaleString()}</td>
     <td>${f(s.vr)}</td><td>${f(s.ma20)}</td><td>${f(s.ma60)}</td><td>${f(s.rsi,1)}</td>
-    <td>${f(s.pe,1)}</td><td>${f(s.dy)}</td><td>${f(s.pb)}</td><td class="${s.fb>0?"up":s.fb<0?"dn":""}">${s.fb==null?"–":s.fb.toLocaleString()}</td><td>${s.fs==null?"–":s.fs}</td><td>${s.ts==null?"–":s.ts}</td><td class="${s.rv>0?"up":s.rv<0?"dn":""}">${f(s.rv,1)}</td><td>${f(s.eps)}</td><td>${spark(s.spark)}</td></tr>`}).join("");
+    <td>${f(s.pe,1)}</td><td>${f(s.dy)}</td><td>${f(s.pb)}</td><td class="${s.fb>0?"up":s.fb<0?"dn":""}">${s.fb==null?"–":s.fb.toLocaleString()}</td><td>${s.fs==null?"–":s.fs}</td><td>${s.ts==null?"–":s.ts}</td><td class="${s.rv>0?"up":s.rv<0?"dn":""}">${f(s.rv,1)}</td><td>${f(s.eps)}</td><td class="${s.osc>0?"up":s.osc<0?"dn":""}">${f(s.osc)}</td><td>${f(s.k,0)}</td><td>${f(s.pb)}</td><td>${spark(s.spark)}</td></tr>`}).join("");
 }
 function init(){
   $("hd").innerHTML=COLS.map(([k,t])=>`<th data-k="${k}">${t}${k===sk?(asc?" ▲":" ▼"):""}</th>`).join("");
