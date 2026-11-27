@@ -96,6 +96,14 @@ svg{vertical-align:middle}
 .btn.ghost:hover{border-color:var(--ac);color:var(--ac)}
 .foot{margin-top:40px;padding:20px 16px;background:#1f2330;border-top:1px solid var(--bd);text-align:center;color:var(--mu);font-size:12px}
 @media (max-width:640px){.top .in{grid-template-columns:auto 1fr;height:auto;padding:10px 12px}.top .meta{display:none}.top nav{justify-content:flex-end;gap:16px}.banner{padding:44px 14px 40px}}
+.star{cursor:pointer;color:var(--mu);margin-right:6px;font-size:15px;user-select:none}.star:hover{color:#fbbf24}.star.on{color:#fbbf24}
+th:first-child,td:first-child{min-width:96px}th:nth-child(2),td:nth-child(2){left:96px}
+.mychip{display:inline-flex;align-items:center}.mychip b{cursor:pointer;color:var(--mu);font-size:12px;padding:0 6px}.mychip b:hover{color:var(--ac)}
+#sb{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px;margin-top:14px}
+.dcell{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column}
+.dcell span{font-size:11.5px;color:var(--mu)}.dcell b{font-size:15px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 </style>
 </head>
 <body>
@@ -119,6 +127,8 @@ svg{vertical-align:middle}
     <button class="btn" id="rs">↺ 重設條件</button>
   </div>
   <div class="presets" id="presets"></div>
+  <div class="presets" id="mine"></div>
+  <div class="tools"><button class="btn sm" id="wl">⭐ 只看自選（0）</button><button class="btn sm" id="bt">🧪 回測這組條件</button><button class="btn sm" id="sh">🔗 複製分享連結</button><button class="btn sm" id="ex">⬇ 匯出 CSV</button></div>
   <div class="tabs" id="tabs">
     <button class="tab on" data-g="tech" data-l="技術面">技術面</button>
     <button class="tab" data-g="ind" data-l="MACD・KD・布林">MACD・KD・布林</button>
@@ -160,6 +170,7 @@ svg{vertical-align:middle}
     <div class="meta" style="align-self:center">※ 法人資料目前僅含上市股票</div>
   </div>
   <div class="grp" data-g="oth">
+    <label class="chk"><input type="checkbox" id="f_etf" checked>排除 ETF（代號 00 開頭）</label>
     <label class="fld">最低股價（元）<input type="number" id="f_p" placeholder="如 10"></label>
     <label class="fld">最低成交量（張）<input type="number" id="f_v" placeholder="如 1000"></label>
   </div>
@@ -172,10 +183,10 @@ svg{vertical-align:middle}
 </div>
 
 <div class="modal" id="md"><div class="mbox">
-  <div class="mh"><div><b id="mt" style="font-size:16px"></b> <span id="mp"></span></div>
+  <div class="mh"><div><b id="mt" style="font-size:16px"></b> <span id="mp"></span></div><div class="rg"><button class="btn sm" id="mst"></button><a class="btn sm" id="mcmp" href="analysis.html">⚖ 與其他股票比較</a></div>
   <div class="rg" id="rg"></div><button id="mx" class="btn sm">✕ 關閉</button></div>
-  <div id="ch"></div><div class="sub" id="lg"><span style="color:#f59e0b">━ 5日線</span>　<span style="color:#2563eb">━ 20日線</span>　<span style="color:#9333ea">━ 60日線</span>　下方柱狀為成交量</div>
-  <div id="tip"></div></div></div>
+  <div id="sb"></div><div id="ch"></div><div class="sub" id="lg"><span style="color:#f59e0b">━ 5日線</span>　<span style="color:#2563eb">━ 20日線</span>　<span style="color:#9333ea">━ 60日線</span>　下方柱狀為成交量</div>
+  <div id="tip"></div><div id="dt"></div></div></div>
 <div class="foot">資料來源：臺灣證券交易所、櫃買中心公開資料。僅供研究參考，不構成投資建議。</div>
 <script>
 const COLS=[["c","代號"],["n","名稱"],["close","收盤"],["pct","漲跌%"],["vol","成交量(張)"],["vr","量比"],
@@ -185,9 +196,10 @@ const $=id=>document.getElementById(id), val=id=>{const v=$(id).value;return v==
 
 async function load(){
   try{const r=await fetch("data/screener.json",{cache:"no-store"});if(!r.ok)throw 0;
-    const j=await r.json();DATA=j.stocks;$("meta").textContent=`資料日期：${j.updated}　共 ${DATA.length} 檔（上市+上櫃，每日收盤後更新）`;}
+    const j=await r.json();DATA=j.stocks;DATE=j.updated;$("meta").textContent=`資料日期：${j.updated}　共 ${DATA.length} 檔（上市+上櫃，每日收盤後更新）`;}
   catch(e){DATA=demo();$("warn").style.display="block";$("meta").textContent="示範資料";}
   init();
+  const hm=location.hash.match(/[#&]f=([^&]+)/);if(hm){try{applyF(JSON.parse(decodeURIComponent(hm[1])))}catch(e){}}
 }
 function demo(){const a=[];for(let i=0;i<300;i++){let p=20+Math.random()*300,s=[];
   for(let k=0;k<30;k++){p*=1+(Math.random()-.48)*.03;s.push(+p.toFixed(2))}
@@ -207,6 +219,8 @@ function filt(){
   const bwv=val("f_bw"),fs=val("f_fs"),ts=val("f_ts"),f5=val("f_f5"),rv=val("f_rv"),rm=val("f_rm"),ep=val("f_eps");
   return DATA.filter(s=>{
     if(m&&s.m!==m)return false;
+    if($("f_etf").checked&&/^00/.test(s.c))return false;
+    if(onlyWL&&!WL.has(s.c))return false;
     if(q&&!(s.c.includes(q)||s.n.toLowerCase().includes(q)))return false;
     if($("f_ma20").checked&&!(s.ma20&&s.close>s.ma20))return false;
     if($("f_ma60").checked&&!(s.ma60&&s.close>s.ma60))return false;
@@ -236,16 +250,20 @@ function filt(){
     if(bwv!=null&&!(s.bw!=null&&s.bw<=bwv))return false;
     return true});
 }
-const PS=10;let PG=1;
+const PS=10;let PG=1,DATE="",onlyWL=false;
+const LS={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let WL=new Set(LS.get("wl",[])),SAVED=LS.get("saved",[]);
 const sgn=x=>x>0?"up":x<0?"dn":"";
+function list(){return filt().sort((a,b)=>{const x=a[sk],y=b[sk];if(x==null)return 1;if(y==null)return-1;
+    return(typeof x==="string"?x.localeCompare(y):x-y)*(asc?1:-1)})}
 function render(){
-  const r=filt().sort((a,b)=>{const x=a[sk],y=b[sk];if(x==null)return 1;if(y==null)return-1;
-    return(typeof x==="string"?x.localeCompare(y):x-y)*(asc?1:-1)});
+  const r=list();
   const pages=Math.max(1,Math.ceil(r.length/PS));PG=Math.min(PG,pages);
   $("cnt").innerHTML=`<span>符合條件 <b>${r.length.toLocaleString()}</b> 檔</span><span class="meta">每頁 ${PS} 檔・第 ${PG} / ${pages} 頁・點任一列看走勢圖</span>`;
   const f=(x,d=2)=>x==null?"–":x.toFixed(d);
   $("bd").innerHTML=r.length?r.slice((PG-1)*PS,PG*PS).map(s=>{const c=sgn(s.pct);
-    return `<tr data-c="${s.c}"><td class="code">${s.c}</td><td>${s.n}<span class="tag">${s.m}</span></td><td class="${c}">${f(s.close)}</td>
+    return `<tr data-c="${s.c}"><td class="code"><span class="star ${WL.has(s.c)?"on":""}" data-s="${s.c}" title="加入／移除自選">${WL.has(s.c)?"★":"☆"}</span>${s.c}</td><td>${s.n}<span class="tag">${s.m}</span></td><td class="${c}">${f(s.close)}</td>
     <td class="${c}">${s.pct>0?"+":""}${f(s.pct)}</td><td>${Math.round(s.vol/1000).toLocaleString()}</td>
     <td>${f(s.vr)}</td><td>${f(s.ma20)}</td><td>${f(s.ma60)}</td><td>${f(s.rsi,1)}</td>
     <td>${f(s.pe,1)}</td><td>${f(s.dy)}</td><td>${f(s.pb)}</td><td class="${sgn(s.fb)}">${s.fb==null?"–":s.fb.toLocaleString()}</td><td>${s.fs==null?"–":s.fs}</td><td>${s.ts==null?"–":s.ts}</td><td class="${sgn(s.rv)}">${f(s.rv,1)}</td><td>${f(s.eps)}</td><td class="${sgn(s.osc)}">${f(s.osc)}</td><td>${f(s.k,0)}</td><td>${f(s.bp)}</td><td>${spark(s.spark)}</td></tr>`}).join("")
@@ -263,10 +281,10 @@ function init(){
 }
 function badges(){document.querySelectorAll(".tab").forEach(t=>{
   const g=document.querySelector(`.grp[data-g="${t.dataset.g}"]`);let n=0;
-  g.querySelectorAll("input").forEach(e=>{if(e.type==="checkbox"?e.checked:e.value!=="")n++});
+  g.querySelectorAll("input").forEach(e=>{if(e.id==="f_etf")return;if(e.type==="checkbox"?e.checked:e.value!=="")n++});
   t.innerHTML=t.dataset.l+(n?`<i>${n}</i>`:"")})}
-function clearF(){document.querySelectorAll("#flt input").forEach(e=>{if(e.type==="checkbox")e.checked=false;else e.value=""});$("f_m").value=""}
-function applyF(o){clearF();for(const k in o){const e=$(k);if(e.type==="checkbox")e.checked=!!o[k];else e.value=o[k]}PG=1;render();badges()}
+function clearF(){document.querySelectorAll("#flt input").forEach(e=>{if(e.type==="checkbox")e.checked=false;else e.value=""});$("f_m").value="";$("f_etf").checked=true}
+function applyF(o){clearF();for(const k in o){const e=$(k);if(!e)continue;if(e.type==="checkbox")e.checked=!!o[k];else e.value=o[k]}PG=1;render();badges()}
 const PRESETS=[["🚀 強勢多頭",{f_bull:1,f_ma60:1,f_v:1000}],["💰 高殖利率",{f_dy:5,f_pe:15,f_v:500}],["🏦 外資連買",{f_fs:3,f_v:1000}],
   ["📈 營收成長",{f_rv:20,f_eps:1}],["🔥 突破爆量",{f_brk:1,f_vr:2,f_v:1000}],["🩹 超賣反彈",{f_kl:1,f_rmax:35}]];
 $("presets").innerHTML="<span>快速篩選：</span>"+PRESETS.map(([t],i)=>`<button class="chipb" data-i="${i}">${t}</button>`).join("");
@@ -277,47 +295,102 @@ $("tabs").onclick=e=>{const g=e.target.closest(".tab");if(!g)return;
   document.querySelectorAll(".grp").forEach(x=>x.classList.toggle("on",x.dataset.g===g.dataset.g))};
 $("pager").onclick=e=>{const b=e.target.closest("button");if(!b||b.disabled)return;PG=+b.dataset.p;render();$("cnt").scrollIntoView({behavior:"smooth",block:"start"})};
 document.querySelectorAll("#flt input,#flt select").forEach(e=>e.addEventListener("input",()=>{PG=1;render();badges()}));
-let HIST=null,CUR=null,RNG=66;
+
+function getF(){const o={};document.querySelectorAll("#flt input,#flt select").forEach(e=>{if(!e.id)return;
+  if(e.type==="checkbox"){if(e.id==="f_etf"){if(!e.checked)o.f_etf=0}else if(e.checked)o[e.id]=1}else if(e.value!=="")o[e.id]=e.value});return o}
+function flash(b,t){const o=b.textContent;b.textContent=t;setTimeout(()=>b.textContent=o,1400)}
+function renderMine(){$("mine").innerHTML="<span>我的組合：</span>"+(SAVED.length?SAVED.map((x,i)=>`<span class="mychip"><button class="chipb" data-a="${i}">${esc(x.n)}</button><b data-d="${i}" title="刪除">✕</b></span>`).join(""):'<span class="meta">尚未儲存</span>')+'<button class="chipb" id="svb">💾 儲存目前條件</button>'}
+$("mine").onclick=e=>{const t=e.target;
+  if(t.dataset.a!=null)applyF(SAVED[+t.dataset.a].f);
+  else if(t.dataset.d!=null){SAVED.splice(+t.dataset.d,1);LS.set("saved",SAVED);renderMine()}
+  else if(t.id==="svb"){const f=getF();if(!Object.keys(f).length)return alert("請先設定一些條件再儲存");
+    const n=(prompt("幫這組條件取個名字：","我的組合 "+(SAVED.length+1))||"").trim();if(!n)return;
+    SAVED.push({n:n.slice(0,20),f});LS.set("saved",SAVED);renderMine()}};
+function updWL(){$("wl").textContent=`⭐ 只看自選（${WL.size}）`}
+function toggleWL(c){WL.has(c)?WL.delete(c):WL.add(c);LS.set("wl",[...WL]);updWL()}
+$("wl").onclick=()=>{onlyWL=!onlyWL;$("wl").classList.toggle("primary",onlyWL);PG=1;render()};
+$("bt").onclick=()=>{location.href="analysis.html#bt="+encodeURIComponent(JSON.stringify(getF()))};
+$("sh").onclick=async e=>{const u=location.origin+location.pathname+"#f="+encodeURIComponent(JSON.stringify(getF()));
+  try{await navigator.clipboard.writeText(u);flash(e.target,"✓ 已複製")}catch(x){prompt("複製下方連結：",u)}};
+$("ex").onclick=()=>{const r=list(),cols=COLS.filter(c=>c[0]!=="spark");
+  const q=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const csv="\ufeff"+cols.map(c=>q(c[1])).join(",")+"\n"+r.map(s=>cols.map(([k])=>q(k==="vol"?Math.round(s.vol/1000):s[k])).join(",")).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`選股結果_${DATE||"data"}.csv`;a.click()};
+renderMine();updWL();
+let HIST=null,INST=null,CUR=null,CURC=null,RNG=66,SUB="vol",BOLL=false;
 async function getHist(){if(HIST)return HIST;try{const r=await fetch("data/history.json");if(!r.ok)throw 0;HIST=await r.json()}catch(e){HIST={}}return HIST}
-async function openChart(code){
-  const s=DATA.find(x=>x.c===code);if(!s)return;
-  $("mt").textContent=`${s.c} ${s.n}`;
-  const c=s.pct>0?"up":s.pct<0?"dn":"";
-  $("mp").innerHTML=`<span class="${c}">${s.close.toFixed(2)}　${s.pct>0?"+":""}${s.pct.toFixed(2)}%</span>`;
-  $("ch").innerHTML='<div class="sub">載入中…</div>';$("md").classList.add("on");
-  const h=await getHist();let d=h[code]&&h[code].d;
-  if(!d||d.length<2)d=(s.spark||[]).map((v,i)=>["第"+(i+1)+"天",v,0]);
-  CUR=d;draw();
-}
+async function getInst(){if(INST)return INST;try{const r=await fetch("data/inst.json");if(!r.ok)throw 0;INST=await r.json()}catch(e){INST={}}return INST}
+const ema=(a,n)=>{const k=2/(n+1);let e=null;return a.map(v=>e=e==null?v:v*k+e*(1-k))};
+const kdArr=cl=>{let k=50,d=50;const K=[],D=[];for(let i=0;i<cl.length;i++){if(i>=8){const w=cl.slice(i-8,i+1),lo=Math.min(...w),hi=Math.max(...w),r=hi===lo?50:(cl[i]-lo)/(hi-lo)*100;k=k*2/3+r/3;d=d*2/3+k/3}K.push(k);D.push(d)}return[K,D]};
+const boll=cl=>{const U=[],L=[];cl.forEach((_,i)=>{if(i<19){U.push(null);L.push(null);return}const w=cl.slice(i-19,i+1),m=w.reduce((a,b)=>a+b,0)/20,sd=Math.sqrt(w.reduce((a,b)=>a+(b-m)**2,0)/20);U.push(m+2*sd);L.push(m-2*sd)});return[U,L]};
 const ma=(cl,n)=>cl.map((_,i)=>i+1<n?null:cl.slice(i+1-n,i+1).reduce((a,b)=>a+b,0)/n);
+function starBtn(){const on=WL.has(CURC);$("mst").textContent=on?"★ 已自選":"☆ 加入自選";$("mst").classList.toggle("primary",on)}
+$("mst").onclick=()=>{toggleWL(CURC);starBtn();render()};
+async function openChart(code){
+  const s=DATA.find(x=>x.c===code);if(!s)return;CURC=code;
+  $("mt").textContent=`${s.c} ${s.n}`;
+  $("mp").innerHTML=`<span class="${sgn(s.pct)}">${s.close.toFixed(2)}　${s.pct>0?"+":""}${s.pct.toFixed(2)}%</span>`;
+  $("mcmp").href="analysis.html#c="+code;starBtn();
+  $("ch").innerHTML='<div class="sub">載入中…</div>';$("dt").innerHTML="";$("md").classList.add("on");
+  const h=await getHist();if(CURC!==code)return;
+  let d=h[code]&&h[code].d;if(!d||d.length<2)d=(s.spark||[]).map((v,i)=>["第"+(i+1)+"天",v,0]);
+  CUR=d;draw();detail(s);
+}
 function draw(){
-  const full=CUR,N=Math.min(RNG,full.length),off=full.length-N,cl=full.map(x=>x[1]);
+  const full=CUR,N=Math.min(RNG,full.length),off=full.length-N,cl=full.map(x=>x[1]),sl=a=>a.slice(off);
   $("rg").innerHTML=[[22,"1個月"],[66,"3個月"],[130,"全部"]].map(([n,t])=>`<button data-n="${n}" class="btn sm ${n===RNG?"primary":""}">${t}</button>`).join("");
-  const M=[[5,"#f59e0b"],[20,"#2563eb"],[60,"#9333ea"]].map(([n,col])=>[n,col,ma(cl,n).slice(off)]);
+  $("sb").innerHTML='<span class="meta">副圖：</span>'+[["vol","成交量"],["macd","MACD"],["kd","KD"]].map(([k,t])=>`<button data-s="${k}" class="btn sm ${k===SUB?"primary":""}">${t}</button>`).join("")+`<button data-b="1" class="btn sm ${BOLL?"primary":""}">布林通道</button>`;
+  const M=[[5,"#f59e0b"],[20,"#60a5fa"],[60,"#c084fc"]].map(([n,col])=>[n,col,sl(ma(cl,n))]);
+  const E12=ema(cl,12),E26=ema(cl,26),DIF=E12.map((v,i)=>v-E26[i]),SIG=ema(DIF,9);
+  const dd=sl(DIF),ss=sl(SIG),oo=dd.map((v,i)=>v-ss[i]),[K0,D0]=kdArr(cl),kk=sl(K0),dk=sl(D0),[BU,BL]=boll(cl),bu=sl(BU),bl=sl(BL);
   const D=full.slice(off),p=D.map(x=>x[1]);
-  const vals=p.concat(...M.map(m=>m[2].filter(v=>v!=null)));
+  const vals=p.concat(...M.map(m=>m[2].filter(v=>v!=null)),BOLL?bu.filter(v=>v!=null):[],BOLL?bl.filter(v=>v!=null):[]);
   let lo=Math.min(...vals),hi=Math.max(...vals);const pad=(hi-lo)*.06||1;lo-=pad;hi+=pad;
-  const W=860,L=48,R=8,PT=10,PB=270,VT=290,VB=360,st=(W-L-R)/Math.max(N-1,1);
-  const X=i=>L+i*st,Y=v=>PB-(v-lo)/(hi-lo)*(PB-PT);
-  const vm=Math.max(...D.map(x=>x[2]),1),bw=Math.max((W-L-R)/N*.7,1);
+  const W=860,L=48,R=8,PT=10,PB=262,VT=292,VB=360,st=(W-L-R)/Math.max(N-1,1);
+  const X=i=>L+i*st,Y=v=>PB-(v-lo)/(hi-lo)*(PB-PT),bw=Math.max((W-L-R)/N*.7,1);
+  const line=(a,Yf,col,dash)=>{const pts=a.map((v,i)=>v==null?null:`${X(i).toFixed(1)},${Yf(v).toFixed(1)}`).filter(Boolean).join(" ");return pts?`<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.3" ${dash?'stroke-dasharray="4 3"':""}/>`:""};
   let g="";
   for(let k=0;k<=4;k++){const v=lo+(hi-lo)*k/4,y=Y(v);g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--bd)"/><text x="${L-6}" y="${y+4}" text-anchor="end" font-size="11" fill="var(--mu)">${v.toFixed(v>100?0:1)}</text>`}
-  D.forEach((x,i)=>{const up=i===0||x[1]>=D[i-1][1],h=x[2]/vm*(VB-VT);g+=`<rect x="${X(i)-bw/2}" y="${VB-h}" width="${bw}" height="${h}" fill="var(${up?"--up":"--dn"})" opacity=".55"/>`});
-  M.forEach(([n,col,a])=>{const pts=a.map((v,i)=>v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");if(pts)g+=`<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.2"/>`});
+  g+=`<text x="${L}" y="${VT-4}" font-size="11" fill="var(--mu)">${{vol:"成交量",macd:"MACD（橘＝DIF，藍＝訊號線，柱＝差值）",kd:"KD（橘＝K，藍＝D）"}[SUB]}</text>`;
+  if(SUB==="vol"){const vm=Math.max(...D.map(x=>x[2]),1);D.forEach((x,i)=>{const up=i===0||x[1]>=D[i-1][1],h=x[2]/vm*(VB-VT);g+=`<rect x="${X(i)-bw/2}" y="${VB-h}" width="${bw}" height="${h}" fill="var(${up?"--up":"--dn"})" opacity=".55"/>`})}
+  else if(SUB==="macd"){const mx=Math.max(1e-9,...dd.concat(ss,oo).map(Math.abs)),zy=(VT+VB)/2,Ys=v=>zy-v/mx*(VB-VT)/2;
+    g+=`<line x1="${L}" x2="${W-R}" y1="${zy}" y2="${zy}" stroke="var(--bd)"/>`;
+    oo.forEach((v,i)=>{g+=`<rect x="${X(i)-bw/2}" y="${Math.min(zy,Ys(v))}" width="${bw}" height="${Math.abs(Ys(v)-zy)}" fill="var(${v>=0?"--up":"--dn"})" opacity=".6"/>`});
+    g+=line(dd,Ys,"#f59e0b")+line(ss,Ys,"#60a5fa")}
+  else{const Ys=v=>VB-v/100*(VB-VT);[20,80].forEach(v=>g+=`<line x1="${L}" x2="${W-R}" y1="${Ys(v)}" y2="${Ys(v)}" stroke="var(--mu)" stroke-dasharray="3" opacity=".5"/><text x="${L-6}" y="${Ys(v)+4}" text-anchor="end" font-size="11" fill="var(--mu)">${v}</text>`);
+    g+=line(kk,Ys,"#f59e0b")+line(dk,Ys,"#60a5fa")}
+  if(BOLL)g+=line(bu,Y,"#94a3b8",1)+line(bl,Y,"#94a3b8",1);
+  M.forEach(([n,col,a])=>g+=line(a,Y,col));
   g+=`<polyline points="${p.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--tx)" stroke-width="1.8"/>`;
   [0,Math.floor((N-1)/2),N-1].forEach((i,k)=>g+=`<text x="${X(i)}" y="${VB+16}" text-anchor="${k==0?"start":k==2?"end":"middle"}" font-size="11" fill="var(--mu)">${D[i][0]}</text>`);
   g+=`<line id="cx" y1="${PT}" y2="${VB}" stroke="var(--mu)" stroke-dasharray="3" style="display:none"/>`;
   $("ch").innerHTML=`<svg id="sv" viewBox="0 0 ${W} 380" width="100%" style="display:block;touch-action:none">${g}</svg>`;
-  const sv=$("sv"),f=v=>v==null?"–":v.toFixed(2);
+  const sv=$("sv"),f=(v,d=2)=>v==null?"–":v.toFixed(d);
   const mv=e=>{const b=sv.getBoundingClientRect(),t=e.touches?e.touches[0].clientX:e.clientX;
-    let i=Math.round(((t-b.left)/b.width*W-L)/st);i=Math.max(0,Math.min(N-1,i));
+    let i=b.width?Math.round(((t-b.left)/b.width*W-L)/st):N-1;i=Math.max(0,Math.min(N-1,isNaN(i)?N-1:i));
     const cx=$("cx");cx.setAttribute("x1",X(i));cx.setAttribute("x2",X(i));cx.style.display="";
-    $("tip").innerHTML=`${D[i][0]}　收盤 <b>${D[i][1].toFixed(2)}</b>　成交量 ${Math.round(D[i][2]/1000).toLocaleString()} 張　`+M.map(m=>`<span style="color:${m[1]}">${m[0]}MA ${f(m[2][i])}</span>`).join("　")};
+    const sub=SUB==="vol"?`成交量 ${Math.round(D[i][2]/1000).toLocaleString()} 張`:SUB==="macd"?`DIF ${f(dd[i])}　訊號 ${f(ss[i])}　柱 ${f(oo[i])}`:`K ${f(kk[i],1)}　D ${f(dk[i],1)}`;
+    $("tip").innerHTML=`${D[i][0]}　收盤 <b>${D[i][1].toFixed(2)}</b>　${sub}　`+M.map(m=>`<span style="color:${m[1]}">${m[0]}MA ${f(m[2][i])}</span>`).join("　")+(BOLL?`　布林 ${f(bl[i])}～${f(bu[i])}`:"")};
   sv.onmousemove=mv;sv.ontouchmove=mv;mv({clientX:sv.getBoundingClientRect().right});
+}
+async function detail(s){
+  const f=(x,d=2)=>x==null?"–":x.toFixed(d),pc=x=>x==null?"–":(x>0?"+":"")+x.toFixed(1)+"%",n0=x=>x==null?"–":x.toLocaleString();
+  const it=[["本益比",f(s.pe,1)],["殖利率",s.dy==null?"–":f(s.dy)+"%"],["股價淨值比",f(s.pb)],["最新EPS"+(s.eq?`（${s.eq}）`:""),f(s.eps)],
+    ["月營收年增",pc(s.rv)],["月營收月增",pc(s.rm)],["RSI(14)",f(s.rsi,1)],["KD（K／D）",s.k==null?"–":`${f(s.k,0)} / ${f(s.d,0)}`],
+    ["MACD柱",f(s.osc)],["布林%B",f(s.bp)],["布林帶寬",s.bw==null?"–":f(s.bw,1)+"%"],["外資今日（張）",n0(s.fb)],["外資近5日（張）",n0(s.f5)],["外資／投信連買",s.fs==null?"–":`${s.fs} / ${s.ts} 天`]];
+  $("dt").innerHTML=`<div class="dgrid">${it.map(([k,v])=>`<div class="dcell"><span>${k}</span><b>${v}</b></div>`).join("")}</div><div id="inst"></div>`;
+  const inst=await getInst();if(CURC!==s.c)return;const h=(inst[s.c]||[]).slice(-20);
+  if(h.length<2){$("inst").innerHTML='<div class="meta" style="margin-top:12px">三大法人買賣超：此股票沒有資料（法人資料目前僅含上市股票）</div>';return}
+  const W=860,bw=Math.max(W/h.length*.6,3);
+  const row=(ix,y0,lab)=>{const a=h.map(x=>x[ix]/1000),mx=Math.max(1,...a.map(Math.abs)),zy=y0+34,sc=v=>v/mx*30;
+    let t=`<text x="2" y="${y0+10}" font-size="11" fill="var(--mu)">${lab}</text><line x1="0" x2="${W}" y1="${zy}" y2="${zy}" stroke="var(--bd)"/>`;
+    a.forEach((v,i)=>{const x=(i+.5)*W/h.length;t+=`<rect x="${x-bw/2}" y="${v>=0?zy-sc(v):zy}" width="${bw}" height="${Math.max(Math.abs(sc(v)),.5)}" fill="var(${v>=0?"--up":"--dn"})"><title>${h[i][0]}　${Math.round(v).toLocaleString()} 張</title></rect>`});return t};
+  $("inst").innerHTML=`<div class="meta" style="margin:14px 0 4px">三大法人買賣超（近 ${h.length} 個交易日，張）</div><svg viewBox="0 0 ${W} 140" width="100%">${row(1,0,"外資")}${row(2,70,"投信")}</svg>`;
 }
 const closeM=()=>$("md").classList.remove("on");
 $("rg").onclick=e=>{const n=e.target.dataset.n;if(n){RNG=+n;draw()}};
-$("bd").onclick=e=>{const tr=e.target.closest("tr");if(tr&&tr.dataset.c)openChart(tr.dataset.c)};
+$("sb").onclick=e=>{const t=e.target;if(t.dataset.s){SUB=t.dataset.s;draw()}else if(t.dataset.b){BOLL=!BOLL;draw()}};
+$("bd").onclick=e=>{const st=e.target.closest(".star");if(st){toggleWL(st.dataset.s);render();return}const tr=e.target.closest("tr");if(tr&&tr.dataset.c)openChart(tr.dataset.c)};
 $("mx").onclick=closeM;$("md").onclick=e=>{if(e.target.id==="md")closeM()};
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeM()});
 load();
