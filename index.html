@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>台股選股篩選</title>
 <style>
-:root{--bg:#f4f6fb;--card:#fff;--tx:#172033;--mu:#6b7686;--bd:#e5e9f0;--up:#e0352b;--dn:#12a150;--ac:#2563eb;--ac2:#7c3aed;--soft:#eef3ff;--sh:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.06)}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#181c25;--tx:#e8ecf3;--mu:#98a2b3;--bd:#2a303c;--up:#f2685e;--dn:#3ccb7f;--ac:#6b9bff;--ac2:#a78bfa;--soft:#212a3d;--sh:0 1px 2px rgba(0,0,0,.35)}}
+:root{color-scheme:dark;--bg:#171b28;--card:#222839;--tx:#f2f4f8;--mu:#9aa3b8;--bd:#313a54;--up:#ff6b6b;--dn:#34d399;--ac:#ff5a68;--ac2:#ff8a5c;--soft:rgba(255,90,104,.13);--sh:0 2px 10px rgba(0,0,0,.28)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.55 system-ui,-apple-system,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
 .wrap{max-width:1180px;margin:auto;padding:20px 16px 40px}
@@ -17,7 +16,7 @@ h1{font-size:22px;margin:0;letter-spacing:.5px;line-height:1.2}
 .meta{color:var(--mu);font-size:12.5px}.sub{color:var(--mu)}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;font-weight:600;cursor:pointer;text-decoration:none;transition:.15s;box-shadow:var(--sh)}
 .btn:hover{border-color:var(--ac);color:var(--ac);transform:translateY(-1px)}
-.btn.primary{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border-color:transparent}
+.btn.primary{background:var(--ac);color:#fff;border-color:transparent}
 .btn.primary:hover{color:#fff;filter:brightness(1.08)}
 .btn.sm{padding:5px 12px;font-size:13px;box-shadow:none}
 .warn{background:#fff4d6;color:#7a5200;padding:10px 14px;border-radius:12px;margin-bottom:14px;display:none}
@@ -65,21 +64,52 @@ tbody tr:last-child td{border-bottom:0}
 .pg.on{background:var(--ac);border-color:var(--ac);color:#fff}
 .pg:disabled{opacity:.4;cursor:default;border-color:var(--bd);color:var(--mu)}
 svg{vertical-align:middle}
-.modal{position:fixed;inset:0;background:rgba(10,14,22,.55);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:12px;z-index:9}
+.modal{position:fixed;inset:0;background:rgba(10,14,22,.55);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:12px;z-index:50}
 .modal.on{display:flex}
 .mbox{background:var(--card);border-radius:18px;max-width:920px;width:100%;padding:18px;max-height:95vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}
 .mh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .rg{display:flex;gap:6px}
 #tip{min-height:22px;margin-top:8px}
 @media (max-width:640px){.wrap{padding:12px 10px 30px}h1{font-size:19px}.card{padding:12px}}
+
+.top{position:sticky;top:0;z-index:20;background:rgba(31,35,48,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--bd)}
+.top .in{max-width:1180px;margin:auto;padding:0 16px;height:58px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}
+.logo2{font-size:18px;letter-spacing:.5px;white-space:nowrap}.logo2 b{font-weight:800}.logo2 i{font-style:normal;margin-right:8px;color:var(--ac)}
+.top nav{display:flex;gap:26px}
+.top nav a{color:var(--tx);text-decoration:none;font-size:13.5px;letter-spacing:.5px;padding:6px 0;border-bottom:2px solid transparent;transition:.15s}
+.top nav a:hover,.top nav a.on{color:var(--ac)}
+.top nav a.on{border-bottom-color:var(--ac)}
+.top .meta{text-align:right;font-size:12px}
+.banner{padding:68px 16px 60px;background:
+ radial-gradient(circle at 16% 30%,rgba(255,160,90,.20),transparent 42%),
+ radial-gradient(circle at 84% 72%,rgba(90,130,255,.24),transparent 46%),
+ repeating-linear-gradient(35deg,rgba(255,255,255,.04) 0 2px,transparent 2px 44px),
+ repeating-linear-gradient(-55deg,rgba(255,255,255,.04) 0 2px,transparent 2px 62px),
+ linear-gradient(180deg,#252c42,#171b28);border-bottom:1px solid var(--bd)}
+.banner .in{max-width:1180px;margin:auto}
+.banner h1{font-size:clamp(30px,5.2vw,54px);line-height:1.22;font-weight:800;letter-spacing:1px;margin:0 0 14px}
+.banner h1 span{color:var(--ac)}
+.banner p{margin:0 0 26px;font-size:clamp(14px,1.8vw,18px);color:#d5dae6;letter-spacing:.5px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.cta .btn{padding:11px 26px;border-radius:999px}
+.btn.ghost{background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
+.btn.ghost:hover{border-color:var(--ac);color:var(--ac)}
+.foot{margin-top:40px;padding:20px 16px;background:#1f2330;border-top:1px solid var(--bd);text-align:center;color:var(--mu);font-size:12px}
+@media (max-width:640px){.top .in{grid-template-columns:auto 1fr;height:auto;padding:10px 12px}.top .meta{display:none}.top nav{justify-content:flex-end;gap:16px}.banner{padding:44px 14px 40px}}
 </style>
 </head>
 <body>
-<div class="wrap">
-<div class="hero">
-  <div class="brand"><div class="logo">📈</div><div><h1>台股選股篩選</h1><div class="meta" id="meta">載入中…</div></div></div>
-  <a class="btn primary" href="analysis.html">📊 分析工具</a>
-</div>
+<header class="top"><div class="in">
+  <div class="logo2"><i>▲</i><b>台股</b> 選股</div>
+  <nav><a class="on" href="index.html">選股篩選</a><a href="analysis.html">分析工具</a></nav>
+  <div class="meta" id="meta">載入中…</div>
+</div></header>
+<section class="banner"><div class="in">
+  <h1>用數據篩出你的<span>下一檔</span><br>強勢好股</h1>
+  <p>技術指標、籌碼、基本面一次篩選，再用歷史回測比較策略</p>
+  <div class="cta"><a class="btn primary" href="#flt">開始篩選</a><a class="btn ghost" href="analysis.html">📊 分析工具</a></div>
+</div></section>
+<div class="wrap" style="padding-top:26px">
 <div class="warn" id="warn">找不到 data/screener.json，目前顯示的是隨機產生的示範資料，不代表真實行情。</div>
 
 <div class="card" id="flt">
@@ -146,6 +176,7 @@ svg{vertical-align:middle}
   <div class="rg" id="rg"></div><button id="mx" class="btn sm">✕ 關閉</button></div>
   <div id="ch"></div><div class="sub" id="lg"><span style="color:#f59e0b">━ 5日線</span>　<span style="color:#2563eb">━ 20日線</span>　<span style="color:#9333ea">━ 60日線</span>　下方柱狀為成交量</div>
   <div id="tip"></div></div></div>
+<div class="foot">資料來源：臺灣證券交易所、櫃買中心公開資料。僅供研究參考，不構成投資建議。</div>
 <script>
 const COLS=[["c","代號"],["n","名稱"],["close","收盤"],["pct","漲跌%"],["vol","成交量(張)"],["vr","量比"],
 ["ma20","20MA"],["ma60","60MA"],["rsi","RSI"],["pe","本益比"],["dy","殖利率%"],["pb","淨值比"],["fb","外資(張)"],["fs","外資連買"],["ts","投信連買"],["rv","營收YoY%"],["eps","EPS"],["osc","MACD柱"],["k","K"],["bp","布林%B"],["spark","30日"]];
