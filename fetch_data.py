@@ -237,6 +237,42 @@ def backfill(hist, rows):
         print(f"回補 {min(i + 100, len(items))}/{len(items)}")
 
 
+def ema(vals, n):
+    k, e, out = 2 / (n + 1), None, []
+    for v in vals:
+        e = v if e is None else v * k + e * (1 - k)
+        out.append(e)
+    return out
+
+
+def ind(cl):
+    """MACD(12,26,9)、KD(9，以收盤價近似)、布林通道(20,2)"""
+    o = {}
+    if len(cl) >= 35:
+        dif = [a - b for a, b in zip(ema(cl, 12), ema(cl, 26))]
+        sig = ema(dif, 9)
+        o.update(dif=round(dif[-1], 2), osc=round(dif[-1] - sig[-1], 2),
+                 mx=bool(dif[-1] > sig[-1] and dif[-2] <= sig[-2]), mz=bool(dif[-1] > 0))
+    if len(cl) >= 10:
+        k = d = 50.0
+        pk = pd_ = 50.0
+        for i in range(8, len(cl)):
+            w = cl[i - 8:i + 1]
+            lo, hi = min(w), max(w)
+            rsv = 50 if hi == lo else (cl[i] - lo) / (hi - lo) * 100
+            pk, pd_ = k, d
+            k = k * 2 / 3 + rsv / 3
+            d = d * 2 / 3 + k / 3
+        o.update(k=round(k, 1), d=round(d, 1), kx=bool(k > d and pk <= pd_))
+    if len(cl) >= 20:
+        w = cl[-20:]
+        m = sum(w) / 20
+        sd = (sum((x - m) ** 2 for x in w) / 20) ** 0.5
+        if sd > 0:
+            o.update(pb=round((cl[-1] - (m - 2 * sd)) / (4 * sd), 2), bw=round(4 * sd / m * 100, 1))
+    return o
+
+
 def rsi(cl, n=14):
     if len(cl) < n + 1:
         return None
@@ -258,7 +294,7 @@ def build(code, h, today, v, ex=None):
     pe, dy, pb = v.get(code, (None, None, None))
     return dict(c=code, n=h["n"], m=h["m"], close=today["close"], pct=pct, vol=vo[-1],
                 pe=pe, dy=dy, pb=pb, ma5=ma(5), ma20=ma(20), ma60=ma(60), vr=vr,
-                rsi=rsi(cl), brk=bool(hi and cl[-1] > hi), spark=cl[-30:], **(ex or {}))
+                rsi=rsi(cl), brk=bool(hi and cl[-1] > hi), spark=cl[-30:], **ind(cl), **(ex or {}))
 
 
 def main():
