@@ -93,7 +93,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
   <div id="tip"></div></div></div>
 <script>
 const COLS=[["c","代號"],["n","名稱"],["close","收盤"],["pct","漲跌%"],["vol","成交量(張)"],["vr","量比"],
-["ma20","20MA"],["ma60","60MA"],["rsi","RSI"],["pe","本益比"],["dy","殖利率%"],["pb","淨值比"],["fb","外資(張)"],["fs","外資連買"],["ts","投信連買"],["rv","營收YoY%"],["eps","EPS"],["osc","MACD柱"],["k","K"],["pb","布林%B"],["spark","30日"]];
+["ma20","20MA"],["ma60","60MA"],["rsi","RSI"],["pe","本益比"],["dy","殖利率%"],["pb","淨值比"],["fb","外資(張)"],["fs","外資連買"],["ts","投信連買"],["rv","營收YoY%"],["eps","EPS"],["osc","MACD柱"],["k","K"],["bp","布林%B"],["spark","30日"]];
 let DATA=[],sk="vol",asc=false;
 const $=id=>document.getElementById(id), val=id=>{const v=$(id).value;return v===""?null:+v};
 
@@ -145,8 +145,8 @@ function filt(){
     if($("f_mz").checked&&!s.mz)return false;
     if($("f_kx").checked&&!s.kx)return false;
     if($("f_kl").checked&&!(s.k<20))return false;
-    if($("f_bu").checked&&!(s.pb>1))return false;
-    if($("f_bl").checked&&!(s.pb<0))return false;
+    if($("f_bu").checked&&!(s.bp>1))return false;
+    if($("f_bl").checked&&!(s.bp<0))return false;
     if(bwv!=null&&!(s.bw!=null&&s.bw<=bwv))return false;
     return true});
 }
@@ -159,7 +159,7 @@ function render(){
     return `<tr data-c="${s.c}"><td>${s.c}</td><td>${s.n} <span class="tag">${s.m}</span></td><td class="${c}">${f(s.close)}</td>
     <td class="${c}">${s.pct>0?"+":""}${f(s.pct)}</td><td>${Math.round(s.vol/1000).toLocaleString()}</td>
     <td>${f(s.vr)}</td><td>${f(s.ma20)}</td><td>${f(s.ma60)}</td><td>${f(s.rsi,1)}</td>
-    <td>${f(s.pe,1)}</td><td>${f(s.dy)}</td><td>${f(s.pb)}</td><td class="${s.fb>0?"up":s.fb<0?"dn":""}">${s.fb==null?"–":s.fb.toLocaleString()}</td><td>${s.fs==null?"–":s.fs}</td><td>${s.ts==null?"–":s.ts}</td><td class="${s.rv>0?"up":s.rv<0?"dn":""}">${f(s.rv,1)}</td><td>${f(s.eps)}</td><td class="${s.osc>0?"up":s.osc<0?"dn":""}">${f(s.osc)}</td><td>${f(s.k,0)}</td><td>${f(s.pb)}</td><td>${spark(s.spark)}</td></tr>`}).join("");
+    <td>${f(s.pe,1)}</td><td>${f(s.dy)}</td><td>${f(s.pb)}</td><td class="${s.fb>0?"up":s.fb<0?"dn":""}">${s.fb==null?"–":s.fb.toLocaleString()}</td><td>${s.fs==null?"–":s.fs}</td><td>${s.ts==null?"–":s.ts}</td><td class="${s.rv>0?"up":s.rv<0?"dn":""}">${f(s.rv,1)}</td><td>${f(s.eps)}</td><td class="${s.osc>0?"up":s.osc<0?"dn":""}">${f(s.osc)}</td><td>${f(s.k,0)}</td><td>${f(s.bp)}</td><td>${spark(s.spark)}</td></tr>`}).join("");
 }
 function init(){
   $("hd").innerHTML=COLS.map(([k,t])=>`<th data-k="${k}">${t}${k===sk?(asc?" ▲":" ▼"):""}</th>`).join("");
