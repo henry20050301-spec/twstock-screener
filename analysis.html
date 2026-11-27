@@ -3,8 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>台股分析工具</title>
 <style>
-:root{--bg:#f4f6fb;--card:#fff;--tx:#172033;--mu:#6b7686;--bd:#e5e9f0;--up:#e0352b;--dn:#12a150;--ac:#2563eb;--ac2:#7c3aed;--soft:#eef3ff;--sh:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.06)}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#181c25;--tx:#e8ecf3;--mu:#98a2b3;--bd:#2a303c;--up:#f2685e;--dn:#3ccb7f;--ac:#6b9bff;--ac2:#a78bfa;--soft:#212a3d;--sh:0 1px 2px rgba(0,0,0,.35)}}
+:root{color-scheme:dark;--bg:#171b28;--card:#222839;--tx:#f2f4f8;--mu:#9aa3b8;--bd:#313a54;--up:#ff6b6b;--dn:#34d399;--ac:#ff5a68;--ac2:#ff8a5c;--soft:rgba(255,90,104,.13);--sh:0 2px 10px rgba(0,0,0,.28)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.55 system-ui,-apple-system,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
 .wrap{max-width:1080px;margin:auto;padding:20px 16px 40px}
@@ -16,7 +15,7 @@ h1{font-size:22px;margin:0;line-height:1.2}h4{margin:16px 0 8px}
 a{color:var(--ac)}
 .btn,button{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;font-weight:600;cursor:pointer;transition:.15s;text-decoration:none}
 .btn:hover,button:hover{border-color:var(--ac);color:var(--ac);transform:translateY(-1px)}
-.btn.primary,button.primary{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border-color:transparent}
+.btn.primary,button.primary{background:var(--ac);color:#fff;border-color:transparent;border-radius:999px}
 .btn.primary:hover,button.primary:hover{color:#fff;filter:brightness(1.08)}
 input,select{padding:8px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit}
 input:focus,select:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px var(--soft)}
@@ -42,12 +41,43 @@ tr:last-child td{border-bottom:0}
 .bar{height:10px;border-radius:3px;display:inline-block;vertical-align:middle}
 section{display:none}section.on{display:block}
 @media (max-width:640px){.wrap{padding:12px 10px 30px}h1{font-size:19px}.card{padding:12px}}
+
+.top{position:sticky;top:0;z-index:20;background:rgba(31,35,48,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--bd)}
+.top .in{max-width:1180px;margin:auto;padding:0 16px;height:58px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}
+.logo2{font-size:18px;letter-spacing:.5px;white-space:nowrap}.logo2 b{font-weight:800}.logo2 i{font-style:normal;margin-right:8px;color:var(--ac)}
+.top nav{display:flex;gap:26px}
+.top nav a{color:var(--tx);text-decoration:none;font-size:13.5px;letter-spacing:.5px;padding:6px 0;border-bottom:2px solid transparent;transition:.15s}
+.top nav a:hover,.top nav a.on{color:var(--ac)}
+.top nav a.on{border-bottom-color:var(--ac)}
+.top .meta{text-align:right;font-size:12px}
+.banner{padding:68px 16px 60px;background:
+ radial-gradient(circle at 16% 30%,rgba(255,160,90,.20),transparent 42%),
+ radial-gradient(circle at 84% 72%,rgba(90,130,255,.24),transparent 46%),
+ repeating-linear-gradient(35deg,rgba(255,255,255,.04) 0 2px,transparent 2px 44px),
+ repeating-linear-gradient(-55deg,rgba(255,255,255,.04) 0 2px,transparent 2px 62px),
+ linear-gradient(180deg,#252c42,#171b28);border-bottom:1px solid var(--bd)}
+.banner .in{max-width:1180px;margin:auto}
+.banner h1{font-size:clamp(30px,5.2vw,54px);line-height:1.22;font-weight:800;letter-spacing:1px;margin:0 0 14px}
+.banner h1 span{color:var(--ac)}
+.banner p{margin:0 0 26px;font-size:clamp(14px,1.8vw,18px);color:#d5dae6;letter-spacing:.5px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.cta .btn{padding:11px 26px;border-radius:999px}
+.btn.ghost{background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
+.btn.ghost:hover{border-color:var(--ac);color:var(--ac)}
+.foot{margin-top:40px;padding:20px 16px;background:#1f2330;border-top:1px solid var(--bd);text-align:center;color:var(--mu);font-size:12px}
+@media (max-width:640px){.top .in{grid-template-columns:auto 1fr;height:auto;padding:10px 12px}.top .meta{display:none}.top nav{justify-content:flex-end;gap:16px}.banner{padding:44px 14px 40px}}
 </style></head><body>
-<div class="wrap">
-<div class="hero">
-  <div class="brand"><div class="logo">📊</div><div><h1>台股分析工具</h1><div class="mu" id="meta">載入中…</div></div></div>
-  <a class="btn" href="index.html">← 回選股篩選</a>
-</div>
+<header class="top"><div class="in">
+  <div class="logo2"><i>▲</i><b>台股</b> 選股</div>
+  <nav><a href="index.html">選股篩選</a><a class="on" href="analysis.html">分析工具</a></nav>
+  <div class="meta" id="meta">載入中…</div>
+</div></header>
+<section class="banner" style="padding:48px 16px 42px"><div class="in">
+  <h1>比較股票，也比較<span>策略</span></h1>
+  <p>多股走勢疊圖、策略回測、報酬風險地圖，三種工具互相對照</p>
+  <div class="cta"><a class="btn ghost" href="index.html">← 回選股篩選</a></div>
+</div></section>
+<div class="wrap" style="padding-top:26px">
 <div class="tabs" id="tabs">
   <button data-t="cmp" class="on">① 多股比較</button>
   <button data-t="bt">② 策略回測比較</button>
@@ -82,6 +112,7 @@ section{display:none}section.on{display:block}
   </div>
 </section>
 
+<div class="foot">資料來源：臺灣證券交易所、櫃買中心公開資料。僅供研究參考，不構成投資建議。</div>
 <script>
 const $=id=>document.getElementById(id),COL=["#2563eb","#f59e0b","#16a34a","#dc2626","#9333ea","#0891b2"];
 let H={},S=[],SM={},sel=[];
