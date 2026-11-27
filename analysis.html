@@ -3,26 +3,51 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>台股分析工具</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--tx:#1c1f24;--mu:#6b7280;--bd:#e3e6ea;--up:#d92d20;--dn:#12a150;--ac:#2563eb}
-@media (prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1d2026;--tx:#e8eaed;--mu:#9aa1ab;--bd:#2c313a;--up:#f2685e;--dn:#3ccb7f;--ac:#6b9bff}}
+:root{--bg:#f4f6fb;--card:#fff;--tx:#172033;--mu:#6b7686;--bd:#e5e9f0;--up:#e0352b;--dn:#12a150;--ac:#2563eb;--ac2:#7c3aed;--soft:#eef3ff;--sh:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#181c25;--tx:#e8ecf3;--mu:#98a2b3;--bd:#2a303c;--up:#f2685e;--dn:#3ccb7f;--ac:#6b9bff;--ac2:#a78bfa;--soft:#212a3d;--sh:0 1px 2px rgba(0,0,0,.35)}}
 *{box-sizing:border-box}
-body{margin:auto;background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,"Noto Sans TC",sans-serif;padding:16px;max-width:1000px}
-a{color:var(--ac)}h1{font-size:20px;margin:0}
-button,input,select{font:inherit;padding:6px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--card);color:var(--tx)}
-button{cursor:pointer}button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
-.tabs,.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
-.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:480px}
-th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--bd);white-space:nowrap}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.55 system-ui,-apple-system,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
+.wrap{max-width:1080px;margin:auto;padding:20px 16px 40px}
+.hero{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--ac),var(--ac2));display:grid;place-items:center;font-size:22px}
+h1{font-size:22px;margin:0;line-height:1.2}h4{margin:16px 0 8px}
+.mu{color:var(--mu);font-size:12.5px}
+a{color:var(--ac)}
+.btn,button{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;font-weight:600;cursor:pointer;transition:.15s;text-decoration:none}
+.btn:hover,button:hover{border-color:var(--ac);color:var(--ac);transform:translateY(-1px)}
+.btn.primary,button.primary{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border-color:transparent}
+.btn.primary:hover,button.primary:hover{color:#fff;filter:brightness(1.08)}
+input,select{padding:8px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit}
+input:focus,select:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px var(--soft)}
+input[type=checkbox]{accent-color:var(--ac);width:16px;height:16px;padding:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px;border-bottom:1px solid var(--bd);padding-bottom:10px}
+.tabs button{border:0;background:transparent;color:var(--mu);box-shadow:none}
+.tabs button:hover{background:var(--soft);color:var(--ac);transform:none}
+.tabs button.on{background:var(--soft);color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;box-shadow:var(--sh);padding:16px;margin-bottom:18px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
+label{display:inline-flex;gap:6px;align-items:center}
+#stl label{padding:7px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);cursor:pointer;font-size:13px}
+#stl label:has(input:checked){background:var(--soft);border-color:var(--ac);color:var(--ac);font-weight:600}
+.chip{display:inline-flex;gap:6px;align-items:center;padding:4px 12px;border-radius:999px;border:1px solid var(--bd);background:var(--bg)}
+.chip b{cursor:pointer;color:var(--mu)}.chip b:hover{color:var(--up)}
+.tw{overflow-x:auto;border-radius:12px;border:1px solid var(--bd)}
+table{border-collapse:collapse;width:100%;min-width:480px}
+th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--bd);white-space:nowrap;font-variant-numeric:tabular-nums}
+th{color:var(--mu);font-weight:600;font-size:12.5px;background:var(--bg)}
 th:first-child,td:first-child{text-align:left}
-.mu{color:var(--mu);font-size:12px}.up{color:var(--up)}.dn{color:var(--dn)}
-.chip{display:inline-flex;gap:6px;align-items:center;padding:2px 10px;border-radius:12px;border:1px solid var(--bd)}
-.chip b{cursor:pointer}label{display:inline-flex;gap:4px;align-items:center}
+tr:last-child td{border-bottom:0}
+.up{color:var(--up)}.dn{color:var(--dn)}
 .bar{height:10px;border-radius:3px;display:inline-block;vertical-align:middle}
 section{display:none}section.on{display:block}
+@media (max-width:640px){.wrap{padding:12px 10px 30px}h1{font-size:19px}.card{padding:12px}}
 </style></head><body>
-<h1>台股分析工具</h1>
-<div class="mu"><a href="index.html">← 回選股篩選</a>　<span id="meta">載入中…</span></div>
+<div class="wrap">
+<div class="hero">
+  <div class="brand"><div class="logo">📊</div><div><h1>台股分析工具</h1><div class="mu" id="meta">載入中…</div></div></div>
+  <a class="btn" href="index.html">← 回選股篩選</a>
+</div>
 <div class="tabs" id="tabs">
   <button data-t="cmp" class="on">① 多股比較</button>
   <button data-t="bt">② 策略回測比較</button>
@@ -32,7 +57,7 @@ section{display:none}section.on{display:block}
 <section id="cmp" class="on">
   <div class="card">
     <div class="row"><input id="code" placeholder="輸入代號或名稱，如 2330" onkeydown="if(event.key==='Enter')addCode()">
-      <button onclick="addCode()">加入（最多 6 檔）</button>
+      <button class="primary" onclick="addCode()">加入（最多 6 檔）</button>
       <select id="rng" onchange="cmp()"><option value="22">1個月</option><option value="66" selected>3個月</option><option value="130">全部</option></select></div>
     <div class="row" id="chips"></div>
     <div id="cmpout"></div>
@@ -44,7 +69,7 @@ section{display:none}section.on{display:block}
     <div class="mu">勾選多個策略，用過去股價歷史比較「訊號出現後持有 N 天」的表現，並和全市場平均對照。</div>
     <div class="row" id="stl"></div>
     <div class="row"><label>持有天數 <select id="hold"><option>5</option><option selected>10</option><option>20</option></select></label>
-      <button onclick="runBt()">開始回測</button></div>
+      <button class="primary" onclick="runBt()">開始回測</button></div>
     <div id="btout"></div>
   </div>
 </section>
@@ -165,4 +190,4 @@ function scat(){
 }
 function pick(c){if(!sel.includes(c)&&sel.length<6)sel.push(c);show("cmp");cmp()}
 init();
-</script></body></html>
+</script></div></body></html>
