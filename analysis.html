@@ -88,6 +88,7 @@ section{display:none}section.on{display:block}
   <div class="card">
     <div class="row"><input id="code" placeholder="輸入代號或名稱，如 2330" onkeydown="if(event.key==='Enter')addCode()">
       <button class="primary" onclick="addCode()">加入（最多 6 檔）</button>
+      <button onclick="loadWL()">⭐ 載入自選股</button>
       <select id="rng" onchange="cmp()"><option value="22">1個月</option><option value="66" selected>3個月</option><option value="130">全部</option></select></div>
     <div class="row" id="chips"></div>
     <div id="cmpout"></div>
@@ -98,6 +99,7 @@ section{display:none}section.on{display:block}
   <div class="card">
     <div class="mu">勾選多個策略，用過去股價歷史比較「訊號出現後持有 N 天」的表現，並和全市場平均對照。</div>
     <div class="row" id="stl"></div>
+    <div class="mu" id="btnote" style="margin:6px 0 2px;line-height:1.8"></div>
     <div class="row"><label>持有天數 <select id="hold"><option>5</option><option selected>10</option><option>20</option></select></label>
       <button class="primary" onclick="runBt()">開始回測</button></div>
     <div id="btout"></div>
@@ -126,10 +128,12 @@ async function init(){
     S=a.stocks;H=b;$("meta").textContent=`資料日期 ${a.updated}，共 ${S.length} 檔`}
   catch(e){$("meta").textContent="讀不到 data/ 資料，請先在 GitHub Actions 執行 daily-update。";return}
   S.forEach(s=>SM[s.c]=s);
-  const q=(location.hash.match(/c=([\d,]+)/)||[])[1];
+  const q=(location.hash.match(/[#&]c=([\d,]+)/)||[])[1];
   sel=(q?q.split(","):["2330","2317"]).filter(c=>H[c]).slice(0,6);
-  $("stl").innerHTML=Object.keys(STR).map((k,i)=>`<label><input type="checkbox" class="st" value="${k}" ${DEF.includes(k)?"checked":""}>${k}</label>`).join("");
+  try{const bm=location.hash.match(/[#&]bt=([^&]+)/);BTH=bm?JSON.parse(decodeURIComponent(bm[1])):null}catch(e){BTH=null}
+  renderStl();
   cmp();
+  if(BTH){show("bt");runBt()}
 }
 $("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;show(t)};
 function show(t){document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
@@ -173,6 +177,26 @@ const STR={"站上20日線":x=>x.c>x.m20,"站上60日線":x=>x.c>x.m60,"均線�
   "剛站上20日線":x=>x.c>x.m20&&x.pc<=x.pm20,"突破20日新高":x=>x.c>x.hi,"爆量上漲(量比≥2)":x=>x.vr>=2&&x.c>x.pc,"RSI超賣(<30)":x=>x.rsi<30,
   "MACD黃金交叉":x=>x.mx,"MACD黃金交叉且DIF>0":x=>x.mx&&x.dif>0,"KD黃金交叉":x=>x.kx,"KD低檔黃金交叉(K<30)":x=>x.kx&&x.k<30,"KD高檔(K>80)":x=>x.k>80,
   "布林突破上軌":x=>x.pb>1,"布林跌破下軌":x=>x.pb<0};
+const LSget=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const FM={f_ma20:["站上20日線",x=>x.c>x.m20],f_ma60:["站上60日線",x=>x.c>x.m60],f_bull:["均線多頭",x=>x.m5>x.m20&&x.m20>x.m60],f_brk:["突破20日新高",x=>x.c>x.hi],
+  f_mx:["MACD黃金交叉",x=>x.mx],f_mo:["MACD柱>0",x=>x.osc>0],f_mz:["DIF>0",x=>x.dif>0],f_kx:["KD黃金交叉",x=>x.kx],f_kl:["K<20",x=>x.k<20],f_bu:["突破布林上軌",x=>x.pb>1],f_bl:["跌破布林下軌",x=>x.pb<0]};
+const NM={f_vr:["量比≥",(x,v)=>x.vr>=v],f_rmin:["RSI≥",(x,v)=>x.rsi>=v],f_rmax:["RSI≤",(x,v)=>x.rsi<=v],f_bw:["帶寬≤",(x,v)=>x.bw!=null&&x.bw<=v],f_p:["股價≥",(x,v)=>x.c>=v],f_v:["成交量(張)≥",(x,v)=>x.vol>=v]};
+const NOHIST={f_dy:"殖利率",f_pe:"本益比",f_pb:"淨值比",f_rv:"營收年增",f_rm:"營收月增",f_eps:"EPS",f_fs:"外資連買",f_ts:"投信連買",f_f5:"外資5日買超"};
+function condFn(o){const ps=[],lab=[],skip=[];
+  for(const k in o){if(FM[k]&&o[k]){ps.push(FM[k][1]);lab.push(FM[k][0])}
+    else if(NM[k]&&o[k]!==""){const v=+o[k];ps.push(x=>NM[k][1](x,v));lab.push(NM[k][0]+v)}
+    else if(NOHIST[k]&&o[k]!=="")skip.push(NOHIST[k])}
+  return{fn:x=>ps.every(p=>p(x)),lab:lab.join(" ＋ ")||"",skip,n:ps.length}}
+let BTH=null,CUSTOM={};
+function regCustom(){CUSTOM={};
+  if(BTH){const c=condFn(BTH);if(c.n)CUSTOM["🧪 目前選股條件"]=c}
+  LSget("saved",[]).forEach(s=>{const c=condFn(s.f||{});if(c.n)CUSTOM["💾 "+s.n]=c});
+  for(const k in CUSTOM)STR[k]=CUSTOM[k].fn}
+function renderStl(){regCustom();
+  $("stl").innerHTML=Object.keys(STR).map(k=>`<label><input type="checkbox" class="st" value="${esc(k)}" ${(DEF.includes(k)||k==="🧪 目前選股條件")?"checked":""}>${esc(k)}</label>`).join("");
+  $("btnote").innerHTML=Object.entries(CUSTOM).map(([k,c])=>`<div><b>${esc(k)}</b>：${esc(c.lab)}${c.skip.length?`　<span style="color:var(--ac)">（${c.skip.join("、")}沒有歷史資料，回測時已忽略）</span>`:""}</div>`).join("")||'<div>想回測自己的條件？到選股頁設好條件後按「🧪 回測這組條件」，或先「💾 儲存目前條件」，這裡就會出現。</div>'}
+function loadWL(){sel=LSget("wl",[]).filter(c=>H[c]).slice(0,6);if(!sel.length)alert("自選股是空的，或這些股票沒有歷史資料。");cmp()}
 const DEF=["站上20日線","MACD黃金交叉","KD黃金交叉","布林突破上軌"];
 const ema=(a,n)=>{const k=2/(n+1);let e=null;return a.map(v=>e=e==null?v:v*k+e*(1-k))};
 const kdArr=cl=>{let k=50,d=50;const K=[],D=[];for(let i=0;i<cl.length;i++){if(i>=8){const w=cl.slice(i-8,i+1),lo=Math.min(...w),hi=Math.max(...w),r=hi===lo?50:(cl[i]-lo)/(hi-lo)*100;k=k*2/3+r/3;d=d*2/3+k/3}K.push(k);D.push(d)}return[K,D]};
@@ -181,7 +205,7 @@ function runBt(){
   $("btout").innerHTML='<div class="mu">計算中…</div>';
   setTimeout(()=>{
     const Hd=+$("hold").value,acc={ALL:[]};keys.forEach(k=>acc[k]=[]);
-    for(const c in H){const d=H[c].d;if(d.length<70)continue;
+    for(const c in H){const d=H[c].d;if(d.length<70||/^00/.test(c))continue;
       const cl=d.map(x=>x[1]),vo=d.map(x=>x[2]),P=[0];cl.forEach((v,i)=>P.push(P[i]+v));
       const ma=(i,n)=>(P[i+1]-P[i+1-n])/n;
       const E12=ema(cl,12),E26=ema(cl,26),DIF=E12.map((v,i)=>v-E26[i]),SIG=ema(DIF,9),[K,D]=kdArr(cl),P2=[0];cl.forEach((v,i)=>P2.push(P2[i]+v*v));
@@ -193,7 +217,7 @@ function runBt(){
         for(let k=t-20;k<t;k++)hi=Math.max(hi,cl[k]);
         for(let k=t-13;k<=t;k++){const df=cl[k]-cl[k-1];df>0?up+=df:dn-=df}
         const m20=ma(t,20),sdv=Math.sqrt(Math.max(P2[t+1]-P2[t-19]-20*m20*m20,0)/20),pbv=sdv>0?(cl[t]-(m20-2*sdv))/(4*sdv):.5;
-        const x={c:cl[t],pc:cl[t-1],m5:ma(t,5),m20:ma(t,20),m60:ma(t,60),pm20:ma(t-1,20),hi,vr:g>0?vo[t]/(g/5):0,rsi:dn===0?100:100-100/(1+up/dn),dif:DIF[t],mx:DIF[t]>SIG[t]&&DIF[t-1]<=SIG[t-1],k:K[t],kx:K[t]>D[t]&&K[t-1]<=D[t-1],pb:pbv};
+        const x={c:cl[t],pc:cl[t-1],m5:ma(t,5),m20:ma(t,20),m60:ma(t,60),pm20:ma(t-1,20),hi,vr:g>0?vo[t]/(g/5):0,rsi:dn===0?100:100-100/(1+up/dn),osc:DIF[t]-SIG[t],bw:sdv>0?4*sdv/m20*100:null,vol:vo[t]/1000,dif:DIF[t],mx:DIF[t]>SIG[t]&&DIF[t-1]<=SIG[t-1],k:K[t],kx:K[t]>D[t]&&K[t-1]<=D[t-1],pb:pbv};
         acc.ALL.push(r);for(const k of keys)if(STR[k](x))acc[k].push(r)}}
     const st=a=>{if(!a.length)return null;const s=[...a].sort((p,q)=>p-q);return{n:a.length,m:a.reduce((p,q)=>p+q,0)/a.length*100,md:s[s.length>>1]*100,w:a.filter(x=>x>0).length/a.length*100}};
     const B=st(acc.ALL);if(!B){$("btout").innerHTML="歷史資料不足（需要約 70 個交易日以上）。";return}
